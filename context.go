@@ -114,6 +114,92 @@ func (ctx *Context) GetModule(name, revision string) *SchemaModule {
 	return SchemaModuleFromRaw(ctx, m)
 }
 
+func (ctx *Context) GetModuleLatest(name string) *SchemaModule {
+	n := C.CString(name)
+	defer C.free(unsafe.Pointer(n))
+	m := C.ly_ctx_get_module_latest(ctx.raw, n)
+	if m == nil {
+		return nil
+	}
+	return SchemaModuleFromRaw(ctx, m)
+}
+
+func (ctx *Context) GetModuleImplemented(name string) *SchemaModule {
+	n := C.CString(name)
+	defer C.free(unsafe.Pointer(n))
+	m := C.ly_ctx_get_module_implemented(ctx.raw, n)
+	if m == nil {
+		return nil
+	}
+	return SchemaModuleFromRaw(ctx, m)
+}
+
+func (ctx *Context) GetModuleNs(ns, revision string) *SchemaModule {
+	n := C.CString(ns)
+	r := C.CString(revision)
+	defer C.free(unsafe.Pointer(n))
+	defer C.free(unsafe.Pointer(r))
+	m := C.ly_ctx_get_module_ns(ctx.raw, n, r)
+	if m == nil {
+		return nil
+	}
+	return SchemaModuleFromRaw(ctx, m)
+}
+
+func (ctx *Context) GetModuleLatestNs(ns string) *SchemaModule {
+	n := C.CString(ns)
+	defer C.free(unsafe.Pointer(n))
+	m := C.ly_ctx_get_module_latest_ns(ctx.raw, n)
+	if m == nil {
+		return nil
+	}
+	return SchemaModuleFromRaw(ctx, m)
+}
+
+func (ctx *Context) GetModuleImplementedNs(ns string) *SchemaModule {
+	n := C.CString(ns)
+	defer C.free(unsafe.Pointer(n))
+	m := C.ly_ctx_get_module_implemented_ns(ctx.raw, n)
+	if m == nil {
+		return nil
+	}
+	return SchemaModuleFromRaw(ctx, m)
+}
+
+func (ctx *Context) Modules(skipInternal bool) *SchemaModules {
+	return NewSchemaModules(ctx, skipInternal)
+}
+
+// TODO traverse method, need find a way to implement iterator
+
+func (ctx *Context) ResetLatests() {
+	C.ly_ctx_reset_latests(ctx.raw)
+}
+
+func (ctx *Context) InternalModuleCount() uint32 {
+	return uint32(C.ly_ctx_internal_modules_count(ctx.raw))
+}
+
+func (ctx *Context) LoadModule(name string, revision string, features []string) *SchemaModule {
+	n := C.CString(name)
+	r := C.CString(revision)
+	defer C.free(unsafe.Pointer(n))
+	defer C.free(unsafe.Pointer(r))
+	features_ptr := make([]*C.char, 0)
+	for k := range features {
+		vp := C.CString(features[k])
+		defer C.free(unsafe.Pointer(vp))
+		features_ptr = append(features_ptr, vp)
+	}
+	features_ptr = append(features_ptr, nil)
+	fp := (**C.char)(unsafe.Pointer(&features_ptr))
+	m := C.ly_ctx_load_module(ctx.raw, n, r, fp)
+	if m == nil {
+		return nil
+	}
+	return SchemaModuleFromRaw(ctx, m)
+}
+
 // export _cgo_ly_module_import_cb
 func _cgo_ly_module_import_cb(mod_name *C.char, mod_rev *C.char, submod_name *C.char, submod_rev *C.char, user_data *C.void, format C.LYS_INFORMAT, module_data *C.char, _free_module_data *C.ly_module_imp_data_free_clb) C.LY_ERR {
 	mn := C.GoString(mod_name)
