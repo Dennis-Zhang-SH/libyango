@@ -1,4 +1,4 @@
-package libyanggo
+package libyango
 
 /*
 #cgo LDFLAGS: -lyang
@@ -9,7 +9,9 @@ LY_ERR _cgo_ly_module_import_cb(const char *mod_name, const char *mod_rev, const
 */
 import "C"
 import (
+	"encoding/binary"
 	"fmt"
+	"reflect"
 	"unsafe"
 )
 
@@ -44,6 +46,10 @@ func CreateContext(options uint16) (*Context, error) {
 	return &Context{
 		raw: ctx,
 	}, nil
+}
+
+func DestroyContext(ctx *Context) {
+	C.ly_ctx_destroy(ctx.raw)
 }
 
 func (ctx *Context) SetSearchDir(path string) error {
@@ -198,6 +204,50 @@ func (ctx *Context) LoadModule(name string, revision string, features []string) 
 		return nil
 	}
 	return SchemaModuleFromRaw(ctx, m)
+}
+
+func (ctx *Context) FindXPath(path string) (*Set[*Context, CLyscNode], error) {
+	p := C.CString(path)
+	defer C.free(unsafe.Pointer(p))
+	var set *C.struct_ly_set = nil
+	if ret := C.lys_find_xpath(ctx.raw, nil, p, 0, &set); ret != C.LY_SUCCESS {
+		return nil, fmt.Errorf("find_xpath error, error code: %d", ret)
+	}
+	rnodesCount := int((*set).count)
+	if rnodesCount == 0 {
+		return NewSet[*Context, CLyscNode](ctx, nil), nil
+	} else {
+		sp := uintptr(binary.LittleEndian.Uint64((*set).anon0[:]))
+		var s []CLyscNode
+		sh := (*reflect.SliceHeader)(unsafe.Pointer(&s))
+		sh.Data = sp
+		sh.Len = rnodesCount
+		sh.Cap = rnodesCount
+		return NewSet[*Context, CLyscNode](ctx, s), nil
+	}
+}
+
+func (ctx *Context) FindPath(path string) (*SchemaNode, error) {
+	p := C.CString(path)
+	defer C.free(unsafe.Pointer(p))
+	ret := C.lys_find_path(ctx.raw, nil, p, 0)
+	if ret == nil {
+		return nil, fmt.Errorf("find_path error")
+	}
+
+	nodeType := uint((*ret).nodetype)
+	switch nodeType {
+	case Container, Case, Choice, Leaf, LeafList, List, AnyData, Action, Rpc, Input, Output, Notification:
+
+	default:
+		panic("unknown node type")
+	}
+
+	return &SchemaNode{
+		ctx:  ctx,
+		raw:  ret,
+		kind: nodeType,
+	}, nil
 }
 
 // export _cgo_ly_module_import_cb
