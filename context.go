@@ -217,13 +217,18 @@ func (ctx *Context) FindXPath(path string) (*Set[*Context, CLyscNode], error) {
 	if rnodesCount == 0 {
 		return NewSet[*Context, CLyscNode](ctx, nil), nil
 	} else {
-		sp := uintptr(binary.LittleEndian.Uint64((*set).anon0[:]))
+		var sp uintptr
+		if BigEndian {
+			sp = uintptr(binary.BigEndian.Uint64((*set).anon0[:]))
+		} else {
+			sp = uintptr(binary.LittleEndian.Uint64((*set).anon0[:]))
+		}
 		var s []CLyscNode
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&s))
 		sh.Data = sp
 		sh.Len = rnodesCount
 		sh.Cap = rnodesCount
-		return NewSet[*Context, CLyscNode](ctx, s), nil
+		return NewSet(ctx, s), nil
 	}
 }
 
